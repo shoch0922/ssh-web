@@ -11,10 +11,10 @@ module.exports = {
       max_memory_restart: '1G',
       env: {
         NODE_ENV: 'production',
-        NEXT_PORT: 3000,
-        WEBSOCKET_PORT: 3002,
+        PORT: 50001,
+        WEBSOCKET_PORT: 50002,
         NEXT_PUBLIC_WEBSOCKET_HOST: 'localhost',
-        NEXT_PUBLIC_WEBSOCKET_PORT: '3002',
+        NEXT_PUBLIC_WEBSOCKET_PORT: '50002',
         DIRECTORY_POLLING_INTERVAL: 2000,
       },
       error_file: './logs/next-error.log',
@@ -35,7 +35,7 @@ module.exports = {
       max_memory_restart: '512M',
       env: {
         NODE_ENV: 'production',
-        WEBSOCKET_PORT: 3002,
+        WEBSOCKET_PORT: 50002,
         DIRECTORY_POLLING_INTERVAL: 2000,
       },
       error_file: './logs/websocket-error.log',

@@ -421,6 +421,58 @@ export default function SshTerminalTab({
 
     term.open(terminalRef.current);
 
+    // Enable copy/paste functionality
+    // Auto-copy selected text to clipboard
+    term.onSelectionChange(() => {
+      const selection = term.getSelection();
+      if (selection) {
+        navigator.clipboard.writeText(selection).catch(err => {
+          console.error('[SSH Terminal Tab] Failed to copy to clipboard:', err);
+        });
+      }
+    });
+
+    // Handle paste on right-click
+    if (terminalRef.current) {
+      terminalRef.current.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        navigator.clipboard.readText().then(text => {
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({ type: 'input', data: text }));
+          }
+        }).catch(err => {
+          console.error('[SSH Terminal Tab] Failed to read from clipboard:', err);
+        });
+      });
+    }
+
+    // Handle keyboard shortcuts (Ctrl+Shift+C/V)
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+Shift+C: Copy
+      if (e.ctrlKey && e.shiftKey && e.key === 'C') {
+        e.preventDefault();
+        const selection = term.getSelection();
+        if (selection) {
+          navigator.clipboard.writeText(selection).catch(err => {
+            console.error('[SSH Terminal Tab] Failed to copy to clipboard:', err);
+          });
+        }
+      }
+      // Ctrl+Shift+V: Paste
+      if (e.ctrlKey && e.shiftKey && e.key === 'V') {
+        e.preventDefault();
+        navigator.clipboard.readText().then(text => {
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({ type: 'input', data: text }));
+          }
+        }).catch(err => {
+          console.error('[SSH Terminal Tab] Failed to read from clipboard:', err);
+        });
+      }
+    };
+
+    terminalRef.current.addEventListener('keydown', handleKeyDown);
+
     setTerminal(term);
     terminalInstanceRef.current = term;
     fitAddonRef.current = fitAddon;
@@ -469,6 +521,11 @@ export default function SshTerminalTab({
 
       // Disconnect ResizeObserver
       resizeObserver.disconnect();
+
+      // Remove keyboard event listener
+      if (terminalRef.current) {
+        terminalRef.current.removeEventListener('keydown', handleKeyDown);
+      }
 
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);

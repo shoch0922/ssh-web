@@ -6,11 +6,11 @@
 
 ✅ **複数タブ管理** - 最大5つのターミナルタブを同時に管理
 ✅ **ローカル接続** - node-pty + tmuxによる永続化されたローカルターミナル
-✅ **リモート接続** - ssh2ライブラリによる実際のSSH接続
 ✅ **セッション永続化** - tmux + localStorageで作業内容を保持
 ✅ **自動再接続** - 最大5回、2秒間隔で再接続試行
 ✅ **モバイル対応** - タッチ操作、仮想キーボード、スワイプジェスチャー
-✅ **code-server統合** - ブラウザ内VS Code起動（ローカル接続のみ）
+✅ **コピー＆ペースト** - 選択で自動コピー、右クリックでペースト、Ctrl+Shift+C/V対応
+✅ **code-server統合** - ブラウザ内VS Code起動
 
 ## 技術スタック
 
@@ -19,9 +19,9 @@
 - **UI**: React 19 + Tailwind CSS 4
 - **ターミナル**: xterm.js 6
 - **ドラッグ&ドロップ**: @dnd-kit
-- **ローカルSSH**: node-pty + tmux
-- **リモートSSH**: ssh2
+- **ローカルターミナル**: node-pty + tmux
 - **WebSocket**: ws
+- **プロセス管理**: PM2
 
 ## セットアップ
 
@@ -58,15 +58,15 @@ npm start
 `.env.local` ファイルを作成して以下の環境変数を設定できます：
 
 ```bash
-# Next.js サーバーポート（デフォルト: 3000）
-NEXT_PORT=3000
+# Next.js サーバーポート（デフォルト: 50001）
+PORT=50001
 
-# WebSocket サーバーポート（デフォルト: 8081）
-WEBSOCKET_PORT=8081
+# WebSocket サーバーポート（デフォルト: 50002）
+WEBSOCKET_PORT=50002
 
 # WebSocket サーバーホスト（デフォルト: localhost）
 NEXT_PUBLIC_WEBSOCKET_HOST=localhost
-NEXT_PUBLIC_WEBSOCKET_PORT=8081
+NEXT_PUBLIC_WEBSOCKET_PORT=50002
 
 # ディレクトリ監視間隔（ミリ秒、デフォルト: 2000）
 DIRECTORY_POLLING_INTERVAL=2000
@@ -74,25 +74,20 @@ DIRECTORY_POLLING_INTERVAL=2000
 
 ## 使用方法
 
-### ローカル接続
+### ターミナル接続
 
-1. ブラウザで http://localhost:3000 にアクセス
+1. ブラウザで http://localhost:50001 にアクセス（本番環境）
+   - 開発環境: http://localhost:3000
 2. 「新規タブ」ボタンをクリック
-3. 「ローカル」を選択して「接続」をクリック
-4. ローカルターミナルが開きます
+3. ローカルターミナルが開きます
 
-### リモート接続
+### コピー＆ペースト
 
-1. 「新規タブ」ボタンをクリック
-2. 「リモート」を選択
-3. 接続情報を入力：
-   - **ホスト名/IPアドレス**: リモートサーバーのアドレス
-   - **ポート番号**: SSHポート（デフォルト: 22）
-   - **ユーザー名**: SSHユーザー名
-   - **認証方法**: パスワードまたは秘密鍵
-   - **パスワード/秘密鍵**: 認証情報
-4. 「接続」をクリック
-5. リモートサーバーのターミナルが開きます
+- **コピー**: テキストを選択すると自動的にクリップボードにコピー
+- **ペースト**:
+  - 右クリックでペースト
+  - または `Ctrl+Shift+V` でペースト
+- **手動コピー**: `Ctrl+Shift+C` で選択中のテキストをコピー
 
 ### タブ操作
 
@@ -104,28 +99,65 @@ DIRECTORY_POLLING_INTERVAL=2000
 - **タブ並び替え**: ドラッグ&ドロップ
 - **コンテキストメニュー**: タブを右クリック
 
-### code-server統合（ローカル接続のみ）
+### code-server統合
 
-1. ローカル接続のターミナルで作業ディレクトリに移動
+1. ターミナルで作業ディレクトリに移動
 2. 「code-server」ボタンをクリック
 3. ブラウザ内でVS Codeが起動します
 
 ## PM2での本番デプロイ
 
-### PM2のインストール
+### 前提条件
+
+PM2がグローバルにインストールされている必要があります：
 
 ```bash
 npm install -g pm2
 ```
 
-### 起動・停止
+### Makefileを使った管理（推奨）
+
+プロジェクトにはMakefileが含まれており、簡単にPM2を管理できます：
+
+```bash
+# ヘルプを表示
+make help
+
+# ビルドして起動（初回）
+make start
+
+# 状態確認
+make status
+
+# ログ確認
+make logs              # すべてのログ
+make logs-next        # Next.jsのログのみ
+make logs-ws          # WebSocketサーバーのログのみ
+
+# 再起動
+make restart
+
+# ゼロダウンタイムリロード
+make reload
+
+# 停止
+make stop
+
+# プロセス削除
+make delete
+
+# ビルドファイルとログのクリーンアップ
+make clean
+
+# 開発サーバー起動（PM2を使わない）
+make dev
+```
+
+### npm scriptsを使った管理
 
 ```bash
 # すべてのプロセスを起動
 npm run pm2:start
-
-# 状態確認
-npm run pm2:status
 
 # ログ確認
 npm run pm2:logs
@@ -137,7 +169,16 @@ npm run pm2:restart
 npm run pm2:stop
 ```
 
+### 本番環境ポート
+
+本番環境では以下のポートを使用します：
+
+- **Next.js**: http://localhost:50001
+- **WebSocket**: ws://localhost:50002
+
 ### 自動起動の設定
+
+サーバー起動時に自動的にアプリケーションを起動する設定：
 
 ```bash
 # 起動スクリプトを生成
@@ -146,56 +187,41 @@ pm2 startup
 # 表示されたコマンドをroot権限で実行
 # 例: sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u username --hp /home/username
 
+# アプリケーションを起動
+make start
+
 # 現在のプロセスリストを保存
 pm2 save
 ```
 
 ## セキュリティに関する注意
 
-### 認証情報の扱い
-
-⚠️ **重要**: パスワードは絶対にlocalStorageに保存されません
-- パスワードはメモリのみで保持されます
-- 再接続時は再入力が必要です
-- 秘密鍵認証を推奨します
-
-### 秘密鍵認証の使用
-
-サーバー側で秘密鍵ファイルを準備：
-
-```bash
-# SSH鍵ペアの生成（リモートサーバー上で）
-ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa
-
-# 公開鍵をauthorized_keysに追加
-cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
-chmod 600 ~/.ssh/authorized_keys
-
-# 秘密鍵のパスをConnectionSelectorに入力
-# 例: /home/username/.ssh/id_rsa
-```
-
-### 接続情報の検証
-
-- ホスト名のバリデーション
-- ポート範囲の制限（1-65535）
-- タイムアウト設定（30秒）
-
 ### ローカル専用設計
 
+⚠️ **重要**: このアプリケーションはローカルホスト専用です
 - 認証機能なし（localhost からのアクセスのみ想定）
 - 公開インターネットには露出しない前提
 - 必要に応じてリバースプロキシ（nginx等）でBasic認証を追加
+- ファイアウォールで外部からのアクセスをブロック推奨
 
 ## トラブルシューティング
 
 ### WebSocket接続エラー
 
 ```bash
-# WebSocketサーバーが起動しているか確認
-lsof -i :8081
+# WebSocketサーバーが起動しているか確認（本番環境）
+lsof -i :50002
 
-# サーバーを個別に起動
+# 開発環境の場合
+lsof -i :3002
+
+# PM2で起動している場合
+make status
+
+# PM2ログを確認
+make logs-ws
+
+# 開発サーバーを個別に起動
 npm run dev:websocket
 ```
 
@@ -212,22 +238,21 @@ tmux kill-session -t ssh-xxxx
 tmux kill-server
 ```
 
-### リモート接続失敗
-
-- ホスト名/IPアドレスが正しいか確認
-- ポート番号が正しいか確認（デフォルト: 22）
-- ファイアウォールで接続が許可されているか確認
-- SSH鍵認証の場合、秘密鍵ファイルのパスが正しいか確認
-- タイムアウト（30秒）を待ってから再試行
-
-### 接続エラーの詳細確認
+### PM2プロセスのトラブル
 
 ```bash
-# PM2ログを確認
-pm2 logs ssh-web-websocket
+# プロセス状態を確認
+make status
 
-# または直接WebSocketサーバーを起動してログを確認
-npm run dev:websocket
+# ログを確認
+make logs
+
+# プロセスを削除して再起動
+make delete
+make start
+
+# ログファイルをクリーンアップ
+make clean
 ```
 
 ## ディレクトリ構造
@@ -242,13 +267,11 @@ ssh-web/
 │   ├── SshTabManager.tsx     # タブ管理メイン
 │   ├── SshTabBar.tsx         # タブバーUI
 │   ├── SshTerminalTab.tsx    # 個別ターミナル
-│   ├── VirtualKeyboard.tsx   # モバイル仮想キーボード
-│   └── ConnectionSelector.tsx # 接続先選択UI
+│   └── VirtualKeyboard.tsx   # モバイル仮想キーボード
 ├── lib/                      # ユーティリティ
 │   ├── ssh-session-store.ts  # セッション管理
 │   ├── ssh-server.ts         # WebSocketサーバー
-│   ├── ssh-server-standalone.ts # スタンドアロン起動
-│   └── ssh-remote.ts         # ssh2統合
+│   └── ssh-server-standalone.ts # スタンドアロン起動
 ├── types/                    # 型定義
 │   └── ssh.ts                # SSH関連型定義
 ├── package.json
@@ -256,6 +279,7 @@ ssh-web/
 ├── tailwind.config.ts
 ├── next.config.ts
 ├── ecosystem.config.js       # PM2設定
+├── Makefile                  # PM2管理用Makefile
 └── README.md
 ```
 
