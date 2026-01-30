@@ -20,7 +20,6 @@ export default function SshTerminalTab({
   isActive,
   onSessionUpdate,
   onSessionError,
-  remoteCredentials,
 }: SshTerminalTabProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalContainerRef = useRef<HTMLDivElement>(null);
@@ -101,7 +100,7 @@ export default function SshTerminalTab({
     }
 
     console.log(
-      `[SSH Terminal Tab] Connecting ${session.connectionType} session to ${websocketUrl} (attempt ${reconnectAttemptsRef.current + 1}, ` +
+      `[SSH Terminal Tab] Connecting to ${websocketUrl} (attempt ${reconnectAttemptsRef.current + 1}, ` +
       `sessionId: ${session.id}, tab: ${session.name}, ` +
       `host: ${websocketHost}, port: ${websocketPort}, protocol: ${protocol})`
     );
@@ -145,8 +144,6 @@ export default function SshTerminalTab({
         JSON.stringify({
           type: 'init',
           sessionId: sessionIdRef.current,
-          connectionType: session.connectionType,
-          remoteInfo: remoteCredentials,
         })
       );
     };
@@ -193,8 +190,8 @@ export default function SshTerminalTab({
           console.error('[SSH Terminal Tab] Server error:', message.message);
           setError(message.message);
           setConnectionState('error');
-        } else if (message.type === 'current_directory' && session.connectionType === 'local') {
-          // サーバーから送信された現在のディレクトリを処理（ローカル接続のみ）
+        } else if (message.type === 'current_directory') {
+          // サーバーから送信された現在のディレクトリを処理
           const dir = message.directory;
           const basePath = process.env.NEXT_PUBLIC_FILE_MANAGER_BASE_PATH || '/home/shoch0922';
 
