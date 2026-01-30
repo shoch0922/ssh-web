@@ -10,8 +10,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import SshTabBar from './SshTabBar';
 import SshTerminalTab from './SshTerminalTab';
-import ConnectionSelector from './ConnectionSelector';
-import { SshSession, SshSessionStore, ConnectionType, RemoteConnectionInfo } from '@/types/ssh';
+import { SshSession, SshSessionStore } from '@/types/ssh';
 import {
   initializeSessionStore,
   saveSessionStore,
@@ -34,8 +33,6 @@ export default function SshTabManager() {
   const [isCodeServerRunning, setIsCodeServerRunning] = useState(false);
   const [currentCodeServerPort, setCurrentCodeServerPort] = useState<number | null>(null);
   const [showStopConfirmDialog, setShowStopConfirmDialog] = useState(false);
-  const [isConnectionSelectorOpen, setIsConnectionSelectorOpen] = useState(false);
-  const [pendingRemoteCredentials, setPendingRemoteCredentials] = useState<RemoteConnectionInfo | null>(null);
   const sessionRefs = useMemo(() => new Map<string, {}>(), []);
 
   // Initialize sessions on mount
@@ -84,7 +81,13 @@ export default function SshTabManager() {
       return;
     }
 
-    setIsConnectionSelectorOpen(true);
+    const newName = getNextTerminalName(sessions);
+    const newSession = createSession(newName);
+
+    console.log('[SSH Tab Manager] Creating new tab:', { id: newSession.id, name: newSession.name });
+
+    setSessions([...sessions, newSession]);
+    setActiveSessionId(newSession.id);
   }, [sessions]);
 
   // Switch to different tab
@@ -195,32 +198,6 @@ export default function SshTabManager() {
     console.error('[SSH Tab Manager] Session error:', { sessionId, error });
     // Could show toast notification or error indicator on tab
   }, []);
-
-
-  // Handle connection confirmation
-  const handleConnectionConfirm = useCallback((connectionType: ConnectionType, remoteInfo?: RemoteConnectionInfo) => {
-    if (isMaxTabsReached(sessions)) {
-      console.warn('[SSH Tab Manager] Max tabs reached, cannot create new tab');
-      setShowMaxTabsWarning(true);
-      setIsConnectionSelectorOpen(false);
-      return;
-    }
-
-    const newName = getNextTerminalName(sessions, connectionType);
-    const newSession = createSession(newName, connectionType, remoteInfo);
-
-    console.log('[SSH Tab Manager] Creating new tab:', { id: newSession.id, name: newSession.name, type: connectionType });
-
-    setSessions([...sessions, newSession]);
-    setActiveSessionId(newSession.id);
-
-    // Store credentials in state for passing to terminal
-    if (connectionType === 'remote' && remoteInfo) {
-      setPendingRemoteCredentials(remoteInfo);
-    }
-
-    setIsConnectionSelectorOpen(false);
-  }, [sessions]);
 
   // Handle code-server launch
   const handleLaunchCodeServer = useCallback(() => {
@@ -409,7 +386,6 @@ export default function SshTabManager() {
               isActive={session.id === activeSessionId}
               onSessionUpdate={handleSessionUpdate}
               onSessionError={handleSessionError}
-              remoteCredentials={session.id === activeSessionId ? pendingRemoteCredentials || undefined : undefined}
             />
           </div>
         ))}
@@ -539,13 +515,6 @@ export default function SshTabManager() {
           </div>
         </div>
       )}
-
-      {/* Connection Selector Modal */}
-      <ConnectionSelector
-        isOpen={isConnectionSelectorOpen}
-        onConfirm={handleConnectionConfirm}
-        onCancel={() => setIsConnectionSelectorOpen(false)}
-      />
     </div>
   );
 }

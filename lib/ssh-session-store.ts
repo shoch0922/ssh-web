@@ -1,12 +1,11 @@
 /**
- * SSH Session Store (Extended for ssh-web)
+ * SSH Session Store
  *
  * Utilities for managing SSH terminal sessions in localStorage
  * Handles session CRUD operations, cleanup, and migrations
- * Extended to support both local and remote connections
  */
 
-import { SshSession, SshSessionStore, ConnectionType, RemoteConnectionInfo } from '@/types/ssh';
+import { SshSession, SshSessionStore } from '@/types/ssh';
 
 /** localStorage key for session store */
 const STORAGE_KEY = 'ssh_terminal_sessions';
@@ -51,7 +50,6 @@ export function getSessionStore(): SshSessionStore {
 /**
  * Save session store to localStorage
  * Handles QuotaExceededError by keeping only active session
- * Note: Passwords are never saved to localStorage (security)
  */
 export function saveSessionStore(store: SshSessionStore): void {
   // Skip on server-side
@@ -60,20 +58,7 @@ export function saveSessionStore(store: SshSessionStore): void {
   }
 
   try {
-    // Create a sanitized copy without sensitive credentials
-    const sanitizedStore: SshSessionStore = {
-      ...store,
-      sessions: store.sessions.map(session => {
-        // Remove password/passphrase if present (should never be persisted)
-        if (session.remoteInfo) {
-          const { ...sanitizedRemoteInfo } = session.remoteInfo;
-          return { ...session, remoteInfo: sanitizedRemoteInfo };
-        }
-        return session;
-      })
-    };
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitizedStore));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
   } catch (error) {
     console.error('[SSH Session Store] Failed to save sessions:', error);
 
@@ -103,15 +88,9 @@ export function saveSessionStore(store: SshSessionStore): void {
  * Create a new SSH session with generated ID
  *
  * @param name - Display name for the session
- * @param connectionType - Type of connection (local or remote)
- * @param remoteInfo - Remote connection info (without password/passphrase)
  * @returns New session object
  */
-export function createSession(
-  name: string,
-  connectionType: ConnectionType = 'local',
-  remoteInfo?: Omit<RemoteConnectionInfo, 'password' | 'passphrase'>
-): SshSession {
+export function createSession(name: string): SshSession {
   const id = `ssh-${Math.random().toString(36).substring(7)}`;
   const now = new Date().toISOString();
 
@@ -121,9 +100,7 @@ export function createSession(
     tmuxSessionId: id,
     createdAt: now,
     lastAccessedAt: now,
-    isActive: false,
-    connectionType,
-    remoteInfo
+    isActive: false
   };
 }
 
@@ -229,15 +206,14 @@ export function migrateFromLegacySession(): SshSessionStore | null {
 
     console.log('[SSH Session Store] Found legacy session, migrating to multi-session format');
 
-    // Create migrated session (local connection by default)
+    // Create migrated session
     const migratedSession: SshSession = {
       id: legacySessionId,
       name: 'Terminal 1',
       tmuxSessionId: legacySessionId,
       createdAt: new Date().toISOString(),
       lastAccessedAt: new Date().toISOString(),
-      isActive: true,
-      connectionType: 'local'
+      isActive: true
     };
 
     const store: SshSessionStore = {
@@ -274,13 +250,7 @@ function migrateSessionStore(store: any): SshSessionStore {
     // Upgrade from unversioned to v1
     console.log('[SSH Session Store] Upgrading session store to v1');
 
-    // Add connectionType to existing sessions (default to local)
-    const sessions = Array.isArray(store.sessions)
-      ? store.sessions.map((s: any) => ({
-          ...s,
-          connectionType: s.connectionType || 'local'
-        }))
-      : [];
+    const sessions = Array.isArray(store.sessions) ? store.sessions : [];
 
     return {
       version: CURRENT_VERSION,
@@ -290,18 +260,7 @@ function migrateSessionStore(store: any): SshSessionStore {
   }
 
   if (version === CURRENT_VERSION) {
-    // Already current version, but ensure connectionType exists
-    const sessions = Array.isArray(store.sessions)
-      ? store.sessions.map((s: any) => ({
-          ...s,
-          connectionType: s.connectionType || 'local'
-        }))
-      : [];
-
-    return {
-      ...store,
-      sessions
-    };
+    return store as SshSessionStore;
   }
 
   // Future version migrations can be added here
@@ -329,10 +288,6 @@ export function validateSessionStore(store: SshSessionStore): SshSessionStore {
       console.warn('[SSH Session Store] Invalid session, removing:', session);
       return false;
     }
-    // Ensure connectionType exists
-    if (!session.connectionType) {
-      session.connectionType = 'local';
-    }
     return true;
   });
 
@@ -352,20 +307,15 @@ export function validateSessionStore(store: SshSessionStore): SshSessionStore {
  * Get the next available terminal name
  *
  * @param existingSessions - Array of existing sessions
- * @param connectionType - Type of connection (affects naming)
- * @returns Next terminal name (e.g., "Terminal 2", "Remote 1")
+ * @returns Next terminal name (e.g., "Terminal 2")
  */
-export function getNextTerminalName(
-  existingSessions: SshSession[],
-  connectionType: ConnectionType = 'local'
-): string {
-  const prefix = connectionType === 'local' ? 'Terminal' : 'Remote';
+export function getNextTerminalName(existingSessions: SshSession[]): string {
+  const prefix = 'Terminal';
 
   // Find all names that match the pattern
   const numbers = existingSessions
-    .filter(s => s.connectionType === connectionType)
     .map(s => {
-      const match = s.name.match(new RegExp(`^${prefix} (\\d+)$`));
+      const match = s.name.match(/^Terminal (\d+)$/);
       return match ? parseInt(match[1], 10) : 0;
     })
     .filter(n => n > 0);
@@ -414,9 +364,9 @@ export function initializeSessionStore(): SshSessionStore {
   // Validate store integrity
   store = validateSessionStore(store);
 
-  // Create first session if none exist (local connection)
+  // Create first session if none exist
   if (store.sessions.length === 0) {
-    const firstSession = createSession('Terminal 1', 'local');
+    const firstSession = createSession('Terminal 1');
     store.sessions = [firstSession];
     store.activeSessionId = firstSession.id;
     saveSessionStore(store);

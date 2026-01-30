@@ -34,7 +34,6 @@
     "postcss": "^8.5.6",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "ssh2": "^1.15.0",
     "ws": "^8.18.3"
   },
   "devDependencies": {
@@ -42,7 +41,6 @@
     "@types/node": "^25.0.3",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
-    "@types/ssh2": "^1.15.0",
     "@types/ws": "^8.18.1",
     "tailwindcss": "^4.1.18",
     "tsx": "^4.21.0",

@@ -1,41 +1,9 @@
 /**
- * SSH Terminal Session Types (Extended for ssh-web)
+ * SSH Terminal Session Types
  *
  * Type definitions for multi-session SSH terminal management
- * with support for both local and remote connections
+ * with support for local connections only
  */
-
-/**
- * Connection type: local (node-pty + tmux) or remote (ssh2)
- */
-export type ConnectionType = 'local' | 'remote';
-
-/**
- * Remote SSH connection information
- * Note: Passwords are stored in memory only, never persisted
- */
-export interface RemoteConnectionInfo {
-  /** Remote server hostname or IP address */
-  host: string;
-
-  /** SSH port number (default: 22) */
-  port: number;
-
-  /** SSH username */
-  username: string;
-
-  /** Authentication method */
-  authMethod: 'password' | 'privateKey';
-
-  /** Password for password authentication (memory only, never saved) */
-  password?: string;
-
-  /** Path to private key file on server (for privateKey auth) */
-  privateKey?: string;
-
-  /** Passphrase for encrypted private key (memory only, never saved) */
-  passphrase?: string;
-}
 
 /**
  * SSH Terminal session metadata
@@ -59,12 +27,6 @@ export interface SshSession {
 
   /** Whether this is currently the active tab */
   isActive: boolean;
-
-  /** Connection type: local or remote */
-  connectionType: ConnectionType;
-
-  /** Remote connection info (only for remote connections, passwords excluded from persistence) */
-  remoteInfo?: Omit<RemoteConnectionInfo, 'password' | 'passphrase'>;
 }
 
 /**
@@ -92,11 +54,8 @@ export interface SshSessionInfo {
   /** Whether this is a newly created session */
   isNewSession: boolean;
 
-  /** Whether tmux is available on the server (local connections only) */
+  /** Whether tmux is available on the server */
   tmuxAvailable: boolean;
-
-  /** Connection type */
-  connectionType: ConnectionType;
 }
 
 /**
@@ -104,7 +63,7 @@ export interface SshSessionInfo {
  */
 export type SshWebSocketMessage =
   /** Initialize a new session or reconnect to existing */
-  | { type: 'init'; sessionId: string | null; connectionType: ConnectionType; remoteInfo?: RemoteConnectionInfo }
+  | { type: 'init'; sessionId: string | null }
 
   /** Send user input to the terminal */
   | { type: 'input'; data: string }
@@ -113,7 +72,7 @@ export type SshWebSocketMessage =
   | { type: 'resize'; cols: number; rows: number }
 
   /** Server response with session information */
-  | { type: 'session_info'; sessionId: string; isNewSession: boolean; tmuxAvailable: boolean; connectionType: ConnectionType }
+  | { type: 'session_info'; sessionId: string; isNewSession: boolean; tmuxAvailable: boolean }
 
   /** Terminal output from the server */
   | { type: 'output'; data: string }
@@ -145,9 +104,6 @@ export interface SshTerminalTabProps {
 
   /** Callback when a session error occurs */
   onSessionError: (sessionId: string, error: string) => void;
-
-  /** Remote connection info with credentials (for remote connections only) */
-  remoteCredentials?: RemoteConnectionInfo;
 }
 
 /**
@@ -193,18 +149,4 @@ export interface SshSessionWithState extends SshSession {
 
   /** Number of reconnection attempts */
   reconnectAttempts?: number;
-}
-
-/**
- * Props for ConnectionSelector component
- */
-export interface ConnectionSelectorProps {
-  /** Whether the modal is open */
-  isOpen: boolean;
-
-  /** Callback when connection is confirmed */
-  onConfirm: (connectionType: ConnectionType, remoteInfo?: RemoteConnectionInfo) => void;
-
-  /** Callback when modal is canceled */
-  onCancel: () => void;
 }

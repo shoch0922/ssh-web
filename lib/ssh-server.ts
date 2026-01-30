@@ -1,25 +1,17 @@
 /**
- * SSH WebSocket Server (Extended for ssh-web)
+ * SSH WebSocket Server
  *
- * Manages WebSocket connections for both local (node-pty + tmux) and remote (ssh2) terminals
+ * Manages WebSocket connections for local terminals (node-pty + tmux)
  */
 
 import { WebSocketServer, WebSocket } from "ws";
 import * as pty from "node-pty";
 import { execSync } from "child_process";
-import { Client, ClientChannel } from 'ssh2';
-import { SshRemoteConnection } from './ssh-remote';
-import { ConnectionType, RemoteConnectionInfo } from '@/types/ssh';
 
 interface PtySession {
-  ptyProcess?: pty.IPty;           // For local connections
-  sshClient?: Client;              // For remote connections
-  sshConnection?: SshRemoteConnection; // Remote connection wrapper
-  sshStream?: ClientChannel;       // Remote shell stream
+  ptyProcess: pty.IPty;
   ws: WebSocket;
   tmuxSessionId: string;
-  connectionType: ConnectionType;
-  remoteInfo?: RemoteConnectionInfo;
   directoryPollingInterval?: NodeJS.Timeout;
   lastDirectory?: string;
 }
@@ -92,7 +84,6 @@ export const startSshServer = (port: number = 3001) => {
 
     let tmuxSessionId: string | null = null;
     let isNewSession = true;
-    let connectionType: ConnectionType = 'local';
 
     // Wait for init message (5s timeout)
     const initTimeout = setTimeout(() => {
@@ -111,22 +102,9 @@ export const startSshServer = (port: number = 3001) => {
           ws.off("message", handleInitMessage);
 
           const requestedSessionId = parsed.sessionId;
-          connectionType = parsed.connectionType || 'local';
-          const remoteInfo = parsed.remoteInfo;
+          console.log(`[SSH Server] Client requested local session: ${requestedSessionId || "new"}`);
 
-          console.log(`[SSH Server] Client requested ${connectionType} session: ${requestedSessionId || "new"}`);
-
-          if (connectionType === 'local') {
-            initializeLocalPty(requestedSessionId);
-          } else if (connectionType === 'remote' && remoteInfo) {
-            initializeRemoteSSH(requestedSessionId, remoteInfo);
-          } else {
-            ws.send(JSON.stringify({
-              type: 'error',
-              message: 'Invalid connection type or missing remote info'
-            }));
-            ws.close();
-          }
+          initializeLocalPty(requestedSessionId);
         }
       } catch (error) {
         console.error("[SSH Server] Failed to parse init message:", error, message.toString());
@@ -214,8 +192,7 @@ export const startSshServer = (port: number = 3001) => {
       sessions.set(connectionId, {
         ptyProcess,
         ws,
-        tmuxSessionId: tmuxSessionId || "",
-        connectionType: 'local'
+        tmuxSessionId: tmuxSessionId || ""
       });
 
       console.log(`[SSH Server] Local session initialized: connectionId=${connectionId}, tmuxSession=${tmuxSessionId}, isNew=${isNewSession}`);
@@ -224,56 +201,10 @@ export const startSshServer = (port: number = 3001) => {
         type: "session_info",
         sessionId: tmuxSessionId,
         isNewSession,
-        tmuxAvailable,
-        connectionType: 'local'
+        tmuxAvailable
       }));
 
       setupLocalPtyHandlers(connectionId, ptyProcess, ws, tmuxSessionId || "");
-    };
-
-    // Initialize remote SSH connection (ssh2)
-    const initializeRemoteSSH = async (requestedSessionId: string | null, remoteInfo: RemoteConnectionInfo) => {
-      const sessionId = requestedSessionId || `ssh-${Math.random().toString(36).substring(7)}`;
-      const connectionId = Math.random().toString(36).substring(7);
-
-      try {
-        console.log(`[SSH Server] Connecting to remote SSH: ${remoteInfo.host}:${remoteInfo.port}`);
-
-        const sshConn = new SshRemoteConnection();
-        const stream = await sshConn.connect(remoteInfo);
-
-        console.log(`[SSH Server] Remote SSH connected: ${remoteInfo.host}:${remoteInfo.port}`);
-
-        // Save session
-        sessions.set(connectionId, {
-          sshClient: sshConn.client,
-          sshConnection: sshConn,
-          sshStream: stream,
-          ws,
-          tmuxSessionId: sessionId,
-          connectionType: 'remote',
-          remoteInfo
-        });
-
-        // Send session info
-        ws.send(JSON.stringify({
-          type: 'session_info',
-          sessionId,
-          isNewSession: true,
-          tmuxAvailable: false,
-          connectionType: 'remote'
-        }));
-
-        setupRemoteSSHHandlers(connectionId, sshConn, stream, ws);
-
-      } catch (error: any) {
-        console.error('[SSH Server] Remote connection failed:', error);
-        ws.send(JSON.stringify({
-          type: 'error',
-          message: `接続に失敗しました: ${error.message || error}`
-        }));
-        ws.close();
-      }
     };
 
     // Setup handlers for local PTY
@@ -387,71 +318,6 @@ export const startSshServer = (port: number = 3001) => {
         }
       }
     };
-
-    // Setup handlers for remote SSH
-    const setupRemoteSSHHandlers = (
-      connectionId: string,
-      sshConn: SshRemoteConnection,
-      stream: ClientChannel,
-      ws: WebSocket
-    ) => {
-      ws.on("pong", () => {
-        (ws as any).isAlive = true;
-      });
-
-      // Stream data to WebSocket
-      stream.on('data', (data: Buffer) => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'output', data: data.toString() }));
-        }
-      });
-
-      stream.on('close', () => {
-        console.log(`[SSH Server] Remote stream closed: ${connectionId}`);
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({
-            type: 'error',
-            message: 'Remote connection closed'
-          }));
-          ws.close();
-        }
-      });
-
-      stream.stderr.on('data', (data: Buffer) => {
-        console.error(`[SSH Server] Remote stderr: ${data.toString()}`);
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'output', data: data.toString() }));
-        }
-      });
-
-      // WebSocket messages
-      ws.on("message", (message: Buffer) => {
-        try {
-          const parsed = JSON.parse(message.toString());
-
-          if (parsed.type === "input") {
-            sshConn.write(parsed.data);
-          } else if (parsed.type === "resize") {
-            sshConn.resize(parsed.rows, parsed.cols);
-          } else if (parsed.type === "close_session") {
-            console.log(`[SSH Server] Closing remote session: ${connectionId}`);
-            sshConn.disconnect();
-          }
-        } catch (error) {
-          console.error("[SSH Server] WebSocket message error:", error);
-        }
-      });
-
-      ws.on("error", (error) => {
-        console.error(`[SSH Server] WebSocket error for remote connection ${connectionId}:`, error);
-      });
-
-      ws.on("close", () => {
-        console.log(`[SSH Server] WebSocket closed for remote connection: ${connectionId}`);
-        sshConn.disconnect();
-        sessions.delete(connectionId);
-      });
-    };
   });
 
   // Timeout check (every 60s)
@@ -474,6 +340,6 @@ export const startSshServer = (port: number = 3001) => {
 
   console.log(`[SSH Server] WebSocket server started on port ${port}`);
   console.log(`[SSH Server] Keepalive enabled (ping: 30s, timeout: 60s)`);
-  console.log(`[SSH Server] Supports local (node-pty + tmux) and remote (ssh2) connections`);
+  console.log(`[SSH Server] Local connections only (node-pty + tmux)`);
   return wss;
 };
