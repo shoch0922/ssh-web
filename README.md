@@ -25,7 +25,29 @@
 
 ## セットアップ
 
-### 前提条件
+### 自動セットアップ（推奨）
+
+WSL2またはmacOSの場合、自動セットアップスクリプトを使用できます：
+
+```bash
+# リポジトリをクローン
+git clone <repository-url>
+cd ssh-web
+
+# セットアップスクリプトを実行
+./setup.sh
+```
+
+セットアップスクリプトは以下を自動的に行います：
+- OS検出（WSL2/macOS）
+- 必要なパッケージのインストール（Node.js、tmux、ビルドツールなど）
+- PM2のグローバルインストール
+- npm依存関係のインストール
+- インストールの検証
+
+### 手動セットアップ
+
+#### 前提条件
 
 - Node.js 18以上
 - npm
@@ -35,9 +57,15 @@
 ```bash
 # tmuxのインストール（Ubuntu/Debian）
 sudo apt-get install tmux
+
+# ビルドツールのインストール（WSL2/Linux）
+sudo apt-get install build-essential python3
+
+# PM2のインストール（オプション、本番環境用）
+npm install -g pm2
 ```
 
-### インストール
+#### インストール
 
 ```bash
 # 依存関係のインストール
