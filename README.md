@@ -40,7 +40,7 @@ cd ssh-web
 
 セットアップスクリプトは以下を自動的に行います：
 - OS検出（WSL2/macOS）
-- 必要なパッケージのインストール（Node.js、tmux、ビルドツールなど）
+- 必要なパッケージのインストール（Node.js、tmux、code-server、ビルドツールなど）
 - PM2のグローバルインストール
 - npm依存関係のインストール
 - インストールの検証
@@ -53,6 +53,7 @@ cd ssh-web
 - npm
 - Linux環境（RaspberryPi推奨）
 - tmux（オプション、セッション永続化のため）
+- code-server（オプション、ブラウザ内VS Code用）
 
 ```bash
 # tmuxのインストール（Ubuntu/Debian）
@@ -60,6 +61,12 @@ sudo apt-get install tmux
 
 # ビルドツールのインストール（WSL2/Linux）
 sudo apt-get install build-essential python3
+
+# code-serverのインストール
+# WSL2/Linux:
+curl -fsSL https://code-server.dev/install.sh | sh
+# macOS:
+brew install code-server
 
 # PM2のインストール（オプション、本番環境用）
 npm install -g pm2
@@ -129,9 +136,13 @@ DIRECTORY_POLLING_INTERVAL=2000
 
 ### code-server統合
 
+**前提条件:** code-serverがインストールされている必要があります（自動セットアップスクリプトに含まれています）
+
 1. ターミナルで作業ディレクトリに移動
 2. 「code-server」ボタンをクリック
 3. ブラウザ内でVS Codeが起動します
+
+code-serverは認証なしで起動されるため、ローカル環境での使用を推奨します。
 
 ## PM2での本番デプロイ
 

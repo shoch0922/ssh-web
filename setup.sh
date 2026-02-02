@@ -107,6 +107,15 @@ install_macos_deps() {
     else
         print_success "tmux already installed"
     fi
+
+    # code-server
+    if ! command_exists code-server; then
+        print_step "Installing code-server..."
+        brew install code-server
+        print_success "code-server installed"
+    else
+        print_success "code-server already installed"
+    fi
 }
 
 # Install dependencies on WSL2/Linux
@@ -153,6 +162,16 @@ install_wsl2_deps() {
         print_success "tmux installed"
     else
         print_success "tmux already installed"
+    fi
+
+    # code-server
+    if ! command_exists code-server; then
+        print_step "Installing code-server..."
+        print_warning "Installing code-server via official install script..."
+        curl -fsSL https://code-server.dev/install.sh | sh
+        print_success "code-server installed"
+    else
+        print_success "code-server already installed"
     fi
 }
 
@@ -210,6 +229,13 @@ verify_installation() {
         print_success "PM2: $(pm2 -v)"
     else
         print_warning "PM2: Not installed (optional, for production)"
+    fi
+
+    # code-server
+    if command_exists code-server; then
+        print_success "code-server: $(code-server --version | head -n1)"
+    else
+        print_warning "code-server: Not installed (optional, for VS Code in browser)"
     fi
 
     # Build tools
