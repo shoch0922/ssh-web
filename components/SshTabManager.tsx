@@ -215,17 +215,8 @@ export default function SshTabManager() {
 
     console.log('[SSH Tab Manager] code-server launch - using directory:', absolutePath);
 
-    // Find available port (starting from 8888)
-    const basePort = 8888;
-    const maxPort = 8898; // 8888-8898の範囲（11個のポート）
-
-    // Generate a unique port based on session ID hash
-    const sessionHash = activeSession.id.split('-').pop() || '0';
-    const hashValue = parseInt(sessionHash.slice(0, 2), 16);
-    const portOffset = isNaN(hashValue) ? 0 : hashValue % (maxPort - basePort + 1);
-    const port = basePort + portOffset;
-
-    console.log('[SSH Tab Manager] Port calculation:', { sessionHash, hashValue, portOffset, port });
+    // Fixed port for code-server
+    const port = 8080;
     
     setIsCodeServerStarting(true);
     
@@ -242,7 +233,7 @@ export default function SshTabManager() {
     // Use nohup to run code-server in background so it persists
     // Escape the path properly for shell
     const escapedPath = absolutePath.replace(/(["'$`\\])/g, '\\$1');
-    const codeServerCommand = `cd "${escapedPath}" && nohup code-server --bind-addr 0.0.0.0:${port} --auth none --disable-telemetry > /dev/null 2>&1 &\n`;
+    const codeServerCommand = `nohup code-server --bind-addr 0.0.0.0:${port} --auth none --disable-telemetry "${escapedPath}" > /dev/null 2>&1 &\n`;
     
     console.log('[SSH Tab Manager] Launching code-server:', { absolutePath, port, command: codeServerCommand });
     

@@ -42,13 +42,17 @@ function tmuxSessionExists(sessionId: string): boolean {
 // Get current directory from tmux session
 function getTmuxCurrentDirectory(sessionId: string): string | null {
   try {
+    // First check if session exists to avoid noisy errors
+    if (!tmuxSessionExists(sessionId)) {
+      return null;
+    }
     const result = execSync(
       `tmux display-message -p '#{pane_current_path}' -t ${sessionId}`,
       { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }
     );
     return result.trim();
-  } catch (error) {
-    console.error(`[SSH Server] Failed to get current directory for session ${sessionId}:`, error);
+  } catch {
+    // Silently return null - session may have been closed
     return null;
   }
 }
@@ -302,7 +306,13 @@ export const startSshServer = (port: number = 3001) => {
 
           const currentDir = getTmuxCurrentDirectory(tmuxSessionId);
 
-          if (currentDir && currentDir !== session.lastDirectory && ws.readyState === WebSocket.OPEN) {
+          // Stop polling if tmux session no longer exists
+          if (currentDir === null) {
+            clearInterval(directoryPollingInterval);
+            return;
+          }
+
+          if (currentDir !== session.lastDirectory && ws.readyState === WebSocket.OPEN) {
             session.lastDirectory = currentDir;
             ws.send(JSON.stringify({
               type: 'current_directory',

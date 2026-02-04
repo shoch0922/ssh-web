@@ -175,6 +175,62 @@ install_wsl2_deps() {
     fi
 }
 
+# Setup WSL2 port forwarding (Windows side)
+setup_wsl2_port_forwarding() {
+    print_step "Setting up WSL2 port forwarding..."
+
+    # Get WSL2 IP address
+    local wsl_ip=$(hostname -I | awk '{print $1}')
+    if [ -z "$wsl_ip" ]; then
+        print_error "Could not determine WSL2 IP address"
+        return 1
+    fi
+    print_success "WSL2 IP: $wsl_ip"
+
+    # Ports to forward (Next.js, WebSocket, code-server)
+    local ports=(3000 3001 3002 8080 50001 50002)
+
+    print_step "Configuring port forwarding via PowerShell (requires admin)..."
+    print_warning "You may be prompted for Windows admin password"
+
+    # Create PowerShell script content
+    local ps_script=""
+    for port in "${ports[@]}"; do
+        ps_script+="netsh interface portproxy delete v4tov4 listenport=$port listenaddress=0.0.0.0 2>\$null;"
+        ps_script+="netsh interface portproxy add v4tov4 listenport=$port listenaddress=0.0.0.0 connectport=$port connectaddress=$wsl_ip;"
+    done
+    ps_script+="netsh interface portproxy show v4tov4"
+
+    # Execute via PowerShell with elevation
+    if powershell.exe -Command "Start-Process powershell -Verb RunAs -Wait -ArgumentList '-Command', '$ps_script'" 2>/dev/null; then
+        print_success "Port forwarding configured for ports: ${ports[*]}"
+    else
+        print_warning "Could not configure port forwarding automatically"
+        print_warning "Run the following in Windows PowerShell (Admin):"
+        echo ""
+        echo "  # Get WSL IP and setup port forwarding"
+        echo "  \$wsl_ip = '$wsl_ip'"
+        for port in "${ports[@]}"; do
+            echo "  netsh interface portproxy add v4tov4 listenport=$port listenaddress=0.0.0.0 connectport=$port connectaddress=\$wsl_ip"
+        done
+        echo ""
+    fi
+
+    # Add firewall rules
+    print_step "Adding Windows Firewall rules..."
+    local fw_script="New-NetFirewallRule -DisplayName 'SSH Web Terminal' -Direction Inbound -LocalPort 3000,3001,3002,8080,50001,50002 -Protocol TCP -Action Allow -ErrorAction SilentlyContinue"
+
+    if powershell.exe -Command "Start-Process powershell -Verb RunAs -Wait -ArgumentList '-Command', '$fw_script'" 2>/dev/null; then
+        print_success "Firewall rules added"
+    else
+        print_warning "Could not add firewall rules automatically"
+        print_warning "Run the following in Windows PowerShell (Admin):"
+        echo ""
+        echo "  New-NetFirewallRule -DisplayName 'SSH Web Terminal' -Direction Inbound -LocalPort 3000,3001,3002,8080,50001,50002 -Protocol TCP -Action Allow"
+        echo ""
+    fi
+}
+
 # Install PM2 globally
 install_pm2() {
     if ! command_exists pm2; then
@@ -284,6 +340,15 @@ print_next_steps() {
     echo -e "    Development: ${BLUE}http://localhost:3000${NC}"
     echo -e "    Production:  ${BLUE}http://localhost:50001${NC}"
     echo ""
+
+    # WSL2 specific note
+    if [ "$(detect_os)" = "wsl2" ]; then
+        echo -e "  ${YELLOW}WSL2 Note:${NC}"
+        echo "    If port forwarding stops working after WSL restart,"
+        echo "    run this script again or manually update the IP:"
+        echo -e "    ${BLUE}./setup.sh${NC}  (or run the PowerShell commands above)"
+        echo ""
+    fi
 }
 
 # Main
@@ -309,6 +374,12 @@ main() {
     esac
 
     echo ""
+
+    # WSL2 port forwarding (only for WSL2)
+    if [ "$OS" = "wsl2" ]; then
+        setup_wsl2_port_forwarding
+        echo ""
+    fi
 
     # Install PM2
     install_pm2
