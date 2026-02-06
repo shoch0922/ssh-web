@@ -13,7 +13,6 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 50001,
         WEBSOCKET_PORT: 50002,
-        NEXT_PUBLIC_WEBSOCKET_HOST: 'localhost',
         NEXT_PUBLIC_WEBSOCKET_PORT: '50002',
         DIRECTORY_POLLING_INTERVAL: 2000,
       },
@@ -26,7 +25,7 @@ module.exports = {
     },
     {
       name: 'ssh-web-websocket',
-      script: 'tsx',
+      script: 'node_modules/.bin/tsx',
       args: 'lib/ssh-server-standalone.ts',
       cwd: './',
       instances: 1,
