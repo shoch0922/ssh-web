@@ -5,3 +5,4 @@ logs/
 tsconfig.tsbuildinfo
 *.log
 .DS_Store
+.env.*

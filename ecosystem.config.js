@@ -28,6 +28,7 @@ module.exports = {
       script: 'node_modules/.bin/tsx',
       args: 'lib/ssh-server-standalone.ts',
       cwd: './',
+      exec_mode: 'fork',
       instances: 1,
       autorestart: true,
       watch: false,
