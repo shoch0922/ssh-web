@@ -1,12 +1,9 @@
-.PHONY: help install build start stop restart reload logs logs-next logs-ws status delete clean dev \
-       firewall-add firewall-delete
+.PHONY: help install build start stop restart reload logs logs-next logs-ws status delete clean dev
 
 # Variables
 NPM := npm
 PM2 := pm2
 ECOSYSTEM := ecosystem.config.js
-NEXT_PORT := 50001
-WS_PORT := 50002
 
 # Colors for terminal output
 BLUE := \033[0;34m
@@ -22,8 +19,8 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-15s$(NC) %s\n", $$1, $$2}'
 	@echo ""
 	@echo "$(GREEN)Ports:$(NC)"
-	@echo "  Next.js:       http://localhost:$(NEXT_PORT)"
-	@echo "  WebSocket:     ws://localhost:$(WS_PORT)"
+	@echo "  Next.js:       http://localhost:50001"
+	@echo "  WebSocket:     ws://localhost:50002"
 
 install: ## Install dependencies
 	@echo "$(BLUE)Installing dependencies...$(NC)"
@@ -89,26 +86,6 @@ dev: ## Start development server (not PM2)
 	@echo "$(BLUE)Starting development server...$(NC)"
 	@echo "$(YELLOW)Note: This uses the default dev ports (3000, 3002)$(NC)"
 	WEBSOCKET_PORT=3002 NEXT_PUBLIC_WEBSOCKET_PORT=3002 $(NPM) run dev
-
-# =============================================================================
-# Windows Firewall (WSL2 mirrored mode - port forwarding is not needed)
-# =============================================================================
-
-firewall-add: ## Add Windows Firewall rules for external access
-	@echo "$(BLUE)Adding Windows Firewall rules...$(NC)"
-	@powershell.exe -Command "Start-Process netsh -ArgumentList 'advfirewall firewall add rule name=\"WSL2 SSH Web (Next.js)\" dir=in action=allow protocol=TCP localport=$(NEXT_PORT)' -Verb RunAs -Wait" 2>/dev/null || \
-		netsh.exe advfirewall firewall add rule name="WSL2 SSH Web (Next.js)" dir=in action=allow protocol=TCP localport=$(NEXT_PORT)
-	@powershell.exe -Command "Start-Process netsh -ArgumentList 'advfirewall firewall add rule name=\"WSL2 SSH Web (WebSocket)\" dir=in action=allow protocol=TCP localport=$(WS_PORT)' -Verb RunAs -Wait" 2>/dev/null || \
-		netsh.exe advfirewall firewall add rule name="WSL2 SSH Web (WebSocket)" dir=in action=allow protocol=TCP localport=$(WS_PORT)
-	@echo "$(GREEN)Firewall rules added!$(NC)"
-
-firewall-delete: ## Remove Windows Firewall rules for SSH Web ports
-	@echo "$(BLUE)Removing Windows Firewall rules...$(NC)"
-	@powershell.exe -Command "Start-Process netsh -ArgumentList 'advfirewall firewall delete rule name=\"WSL2 SSH Web (Next.js)\"' -Verb RunAs -Wait" 2>/dev/null || \
-		netsh.exe advfirewall firewall delete rule name="WSL2 SSH Web (Next.js)"
-	@powershell.exe -Command "Start-Process netsh -ArgumentList 'advfirewall firewall delete rule name=\"WSL2 SSH Web (WebSocket)\"' -Verb RunAs -Wait" 2>/dev/null || \
-		netsh.exe advfirewall firewall delete rule name="WSL2 SSH Web (WebSocket)"
-	@echo "$(GREEN)Firewall rules removed!$(NC)"
 
 # Default target
 .DEFAULT_GOAL := help
