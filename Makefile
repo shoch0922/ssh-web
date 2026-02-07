@@ -1,9 +1,15 @@
-.PHONY: help install build start stop restart reload logs logs-next logs-ws status delete clean dev
+.PHONY: help install build start stop restart reload logs logs-next logs-ws status delete clean dev \
+       cs-start cs-stop cs-restart cs-logs cs-status
 
 # Variables
 NPM := npm
-PM2 := pm2
+PM2 := npx pm2
 ECOSYSTEM := ecosystem.config.js
+CODE_SERVER := code-server
+CODE_SERVER_PORT := 8080
+CODE_SERVER_DIR := /home/shoch0922
+CODE_SERVER_LOG := logs/code-server.log
+CODE_SERVER_PID := logs/code-server.pid
 
 # Colors for terminal output
 BLUE := \033[0;34m
@@ -21,6 +27,7 @@ help: ## Show this help message
 	@echo "$(GREEN)Ports:$(NC)"
 	@echo "  Next.js:       http://localhost:50001"
 	@echo "  WebSocket:     ws://localhost:50002"
+	@echo "  code-server:   http://localhost:$(CODE_SERVER_PORT)"
 
 install: ## Install dependencies
 	@echo "$(BLUE)Installing dependencies...$(NC)"
@@ -86,6 +93,41 @@ dev: ## Start development server (not PM2)
 	@echo "$(BLUE)Starting development server...$(NC)"
 	@echo "$(YELLOW)Note: This uses the default dev ports (3000, 3002)$(NC)"
 	WEBSOCKET_PORT=3002 NEXT_PUBLIC_WEBSOCKET_PORT=3002 $(NPM) run dev
+
+# ─── code-server (nohup daemon) ──────────────────────────────
+cs-start: ## Start code-server daemon
+	@echo "$(BLUE)Starting code-server as daemon...$(NC)"
+	@mkdir -p logs
+	@if [ -f $(CODE_SERVER_PID) ] && kill -0 $$(cat $(CODE_SERVER_PID)) 2>/dev/null; then \
+		echo "$(YELLOW)code-server is already running (PID: $$(cat $(CODE_SERVER_PID)))$(NC)"; \
+	else \
+		env -u VSCODE_IPC_HOOK_CLI nohup $(CODE_SERVER) --bind-addr 0.0.0.0:$(CODE_SERVER_PORT) $(CODE_SERVER_DIR) > $(CODE_SERVER_LOG) 2>&1 & \
+		echo $$! > $(CODE_SERVER_PID); \
+		echo "$(GREEN)code-server started! (PID: $$(cat $(CODE_SERVER_PID)))$(NC)"; \
+		echo "  http://localhost:$(CODE_SERVER_PORT)"; \
+	fi
+
+cs-stop: ## Stop code-server daemon
+	@echo "$(BLUE)Stopping code-server...$(NC)"
+	@if [ -f $(CODE_SERVER_PID) ]; then \
+		kill $$(cat $(CODE_SERVER_PID)) 2>/dev/null && rm -f $(CODE_SERVER_PID) && \
+		echo "$(GREEN)code-server stopped!$(NC)"; \
+	else \
+		echo "$(YELLOW)No PID file found. code-server may not be running.$(NC)"; \
+	fi
+
+cs-restart: cs-stop cs-start ## Restart code-server daemon
+
+cs-logs: ## Show code-server logs
+	@tail -f $(CODE_SERVER_LOG)
+
+cs-status: ## Show code-server status
+	@if [ -f $(CODE_SERVER_PID) ] && kill -0 $$(cat $(CODE_SERVER_PID)) 2>/dev/null; then \
+		echo "$(GREEN)code-server is running (PID: $$(cat $(CODE_SERVER_PID)))$(NC)"; \
+	else \
+		echo "$(RED)code-server is not running$(NC)"; \
+		rm -f $(CODE_SERVER_PID); \
+	fi
 
 # Default target
 .DEFAULT_GOAL := help
