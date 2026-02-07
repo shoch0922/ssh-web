@@ -20,7 +20,11 @@ import {
   MAX_TABS,
 } from '@/lib/ssh-session-store';
 
-export default function SshTabManager() {
+interface SshTabManagerProps {
+  initialTmuxSessionId?: string | null;
+}
+
+export default function SshTabManager({ initialTmuxSessionId }: SshTabManagerProps) {
   const [sessions, setSessions] = useState<SshSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -34,14 +38,34 @@ export default function SshTabManager() {
     console.log('[SSH Tab Manager] Initializing session store');
     const store = initializeSessionStore();
 
-    setSessions(store.sessions);
-    setActiveSessionId(store.activeSessionId || (store.sessions[0]?.id ?? null));
+    if (initialTmuxSessionId) {
+      // Look for an existing session with this tmuxSessionId
+      const existing = store.sessions.find(s => s.tmuxSessionId === initialTmuxSessionId);
+      if (existing) {
+        console.log('[SSH Tab Manager] Found existing session for tmuxSessionId:', initialTmuxSessionId);
+        setSessions(store.sessions);
+        setActiveSessionId(existing.id);
+      } else {
+        // Create a new session with the specified tmuxSessionId
+        const newSession = createSession(getNextTerminalName(store.sessions));
+        newSession.tmuxSessionId = initialTmuxSessionId;
+        console.log('[SSH Tab Manager] Creating session for tmuxSessionId:', initialTmuxSessionId);
+        const updatedSessions = [...store.sessions, newSession];
+        setSessions(updatedSessions);
+        setActiveSessionId(newSession.id);
+      }
+    } else {
+      setSessions(store.sessions);
+      setActiveSessionId(store.activeSessionId || (store.sessions[0]?.id ?? null));
+    }
+
     setLoading(false);
 
     console.log('[SSH Tab Manager] Loaded sessions:', {
       count: store.sessions.length,
       active: store.activeSessionId,
-      sessions: store.sessions.map(s => ({ id: s.id, name: s.name })),
+      initialTmuxSessionId,
+      sessions: store.sessions.map(s => ({ id: s.id, name: s.name, tmuxSessionId: s.tmuxSessionId })),
     });
   }, []);
 

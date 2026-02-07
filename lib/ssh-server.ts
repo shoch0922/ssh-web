@@ -57,6 +57,71 @@ function getTmuxCurrentDirectory(sessionId: string): string | null {
   }
 }
 
+// List all tmux sessions with details
+interface TmuxSessionInfo {
+  sessionName: string;
+  windowCount: number;
+  createdAt: string;
+  isAttached: boolean;
+  currentPath: string;
+}
+
+function listTmuxSessions(): TmuxSessionInfo[] {
+  if (!isTmuxAvailable()) {
+    return [];
+  }
+
+  try {
+    const output = execSync(
+      "tmux list-sessions -F '#{session_name}\t#{session_windows}\t#{session_created}\t#{session_attached}'",
+      { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] }
+    );
+
+    const sessions: TmuxSessionInfo[] = [];
+    const lines = output.trim().split("\n").filter(Boolean);
+
+    for (const line of lines) {
+      const [name, windows, created, attached] = line.split("\t");
+      if (!name) continue;
+
+      // Get current path for this session
+      let currentPath = "";
+      try {
+        currentPath = execSync(
+          `tmux display-message -p '#{pane_current_path}' -t ${name}`,
+          { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] }
+        ).trim();
+      } catch {
+        // Ignore errors for individual sessions
+      }
+
+      // Convert Unix timestamp to ISO string
+      let createdAt = "";
+      try {
+        const timestamp = parseInt(created, 10);
+        if (!isNaN(timestamp)) {
+          createdAt = new Date(timestamp * 1000).toISOString();
+        }
+      } catch {
+        createdAt = "";
+      }
+
+      sessions.push({
+        sessionName: name,
+        windowCount: parseInt(windows, 10) || 1,
+        createdAt,
+        isAttached: attached === "1",
+        currentPath,
+      });
+    }
+
+    return sessions;
+  } catch {
+    console.log("[SSH Server] Failed to list tmux sessions");
+    return [];
+  }
+}
+
 const tmuxAvailable = isTmuxAvailable();
 
 export const startSshServer = (port: number = 3001) => {
@@ -101,6 +166,18 @@ export const startSshServer = (port: number = 3001) => {
         console.log(`[SSH Server] Received message: ${messageStr.substring(0, 200)}`);
         const parsed = JSON.parse(messageStr);
 
+        if (parsed.type === "list_sessions") {
+          // Return session list without clearing initTimeout or removing listener
+          const sessions = listTmuxSessions();
+          console.log(`[SSH Server] Returning ${sessions.length} tmux sessions`);
+          ws.send(JSON.stringify({
+            type: "sessions_list",
+            sessions,
+            tmuxAvailable,
+          }));
+          return;
+        }
+
         if (parsed.type === "init") {
           clearTimeout(initTimeout);
           ws.off("message", handleInitMessage);
@@ -116,6 +193,11 @@ export const startSshServer = (port: number = 3001) => {
     };
 
     ws.on("message", handleInitMessage);
+
+    // Clear initTimeout if WebSocket closes before init (prevents orphan PTY)
+    ws.on("close", () => {
+      clearTimeout(initTimeout);
+    });
 
     // Initialize local PTY (node-pty + tmux)
     const initializeLocalPty = (requestedSessionId: string | null) => {

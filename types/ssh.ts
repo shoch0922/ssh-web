@@ -45,6 +45,17 @@ export interface SshSessionStore {
 }
 
 /**
+ * Tmux session info returned from server for session selection
+ */
+export interface TmuxSessionInfo {
+  sessionName: string;
+  windowCount: number;
+  createdAt: string;
+  isAttached: boolean;
+  currentPath: string;
+}
+
+/**
  * Session info received from server after WebSocket connection
  */
 export interface SshSessionInfo {
@@ -86,8 +97,8 @@ export type SshWebSocketMessage =
   /** Request list of active sessions from server (optional) */
   | { type: 'list_sessions' }
 
-  /** Server response with list of active sessions (optional) */
-  | { type: 'sessions_list'; sessions: string[] };
+  /** Server response with list of active sessions */
+  | { type: 'sessions_list'; sessions: TmuxSessionInfo[]; tmuxAvailable: boolean };
 
 /**
  * Props for the SshTerminalTab component

@@ -1,8 +1,23 @@
 'use client';
 
+import { useState, useCallback } from 'react';
 import SshTabManager from '@/components/SshTabManager';
+import TmuxSessionSelector from '@/components/TmuxSessionSelector';
 
 export default function Home() {
+  const [showTerminal, setShowTerminal] = useState(false);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+
+  const handleSelectSession = useCallback((tmuxSessionId: string) => {
+    setSelectedSessionId(tmuxSessionId);
+    setShowTerminal(true);
+  }, []);
+
+  const handleCreateNew = useCallback(() => {
+    setSelectedSessionId(null);
+    setShowTerminal(true);
+  }, []);
+
   return (
     <div className="h-full flex flex-col">
       {/* Simple title bar */}
@@ -14,7 +29,14 @@ export default function Home() {
 
       {/* Main terminal area */}
       <main className="flex-1 overflow-hidden max-w-[1600px] mx-auto w-full pt-[60px]">
-        <SshTabManager />
+        {showTerminal ? (
+          <SshTabManager initialTmuxSessionId={selectedSessionId} />
+        ) : (
+          <TmuxSessionSelector
+            onSelectSession={handleSelectSession}
+            onCreateNew={handleCreateNew}
+          />
+        )}
       </main>
     </div>
   );
