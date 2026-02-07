@@ -3,7 +3,7 @@ module.exports = {
     {
       name: 'ssh-web-next',
       script: 'node_modules/next/dist/bin/next',
-      args: 'start',
+      args: 'start --hostname 0.0.0.0',
       cwd: './',
       instances: 1,
       autorestart: true,
